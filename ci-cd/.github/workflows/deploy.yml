@@ -1,0 +1,66 @@
+name: KubeIntel CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pytest requests flask
+      - run: pytest tests/ -v
+
+  build-and-push:
+    name: Build & Push to ECR
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push kubeops-api
+        run: |
+          docker build -t $ECR_REGISTRY/kubeops-api:$IMAGE_TAG services/kubeops-api/
+          docker push $ECR_REGISTRY/kubeops-api:$IMAGE_TAG
+
+      - name: Build and push kubeops-ui
+        run: |
+          docker build -t $ECR_REGISTRY/kubeops-ui:$IMAGE_TAG services/kubeops-ui/
+          docker push $ECR_REGISTRY/kubeops-ui:$IMAGE_TAG
+
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: aws eks update-kubeconfig --name kubeintel-cluster --region $AWS_REGION
+      - run: |
+          kubectl set image deployment/kubeops-api kubeops-api=$ECR_REGISTRY/kubeops-api:$IMAGE_TAG -n kubeintel
+          kubectl set image deployment/kubeops-ui kubeops-ui=$ECR_REGISTRY/kubeops-ui:$IMAGE_TAG -n kubeintel
+          kubectl rollout status deployment/kubeops-api -n kubeintel
+          kubectl rollout status deployment/kubeops-ui -n kubeintel

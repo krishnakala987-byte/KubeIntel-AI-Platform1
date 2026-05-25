@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubeops-api-service
+  namespace: kubeintel
+spec:
+  selector:
+    app: kubeops-api
+  ports:
+    - protocol: TCP
+      port: 5000
+      targetPort: 5000
+      nodePort: 30081
+  type: NodePort

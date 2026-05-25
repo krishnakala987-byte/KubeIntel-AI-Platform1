@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  kubeops-api:
+    build: ./services/kubeops-api
+    ports: ["5000:5000"]
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  kubeops-ui:
+    build: ./services/kubeops-ui
+    ports: ["8501:8501"]
+    environment:
+      - API_URL=http://kubeops-api:5000
+    depends_on:
+      kubeops-api:
+        condition: service_healthy
