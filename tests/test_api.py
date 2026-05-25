@@ -5,6 +5,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'services', 'kubeops-api'))
 
+os.environ.setdefault("GROQ_API_KEY", "test-placeholder-key")
+
 
 def test_log_analyzer_healthy():
     from log_analyzer import parse_logs
@@ -15,13 +17,13 @@ def test_log_analyzer_healthy():
 
 def test_log_analyzer_detects_crashloop():
     from log_analyzer import parse_logs
-    result = parse_logs("CrashLoopBackOff detected in pod")
+    result = parse_logs("CrashLoopBackOff detected in pod api-server-xyz")
     assert result["error_count"] > 0
 
 
 def test_log_analyzer_detects_oom():
     from log_analyzer import parse_logs
-    result = parse_logs("OOMKilled: container exceeded memory limit")
+    result = parse_logs("OOMKilled: container exceeded memory limit of 512Mi")
     assert result["overall_status"] == "CRITICAL"
 
 
@@ -33,7 +35,6 @@ def test_parse_logs_counts_lines():
 
 
 def test_health_endpoint():
-    os.environ["GROQ_API_KEY"] = "test-key-placeholder"
     from app import app
     client = app.test_client()
     response = client.get('/health')
@@ -43,10 +44,10 @@ def test_health_endpoint():
 
 
 def test_analyze_endpoint_missing_query():
-    os.environ["GROQ_API_KEY"] = "test-key-placeholder"
     from app import app
     client = app.test_client()
     response = client.post('/api/v1/analyze',
         json={"context": "some context"},
         content_type='application/json')
     assert response.status_code == 400
+
