@@ -1,3 +1,4 @@
+
 name: KubeIntel CI/CD Pipeline
 
 on:
@@ -20,8 +21,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pytest requests flask
-      - run: pytest tests/ -v
+      - name: Install dependencies
+        run: pip install pytest requests flask flask-cors prometheus-flask-exporter groq==0.13.0 httpx==0.28.1
+      - name: Run tests
+        run: pytest tests/ -v --tb=short
+        continue-on-error: false
 
   build-and-push:
     name: Build & Push to ECR
@@ -36,12 +40,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
       - uses: aws-actions/amazon-ecr-login@v2
-
       - name: Build and push kubeops-api
         run: |
           docker build -t $ECR_REGISTRY/kubeops-api:$IMAGE_TAG services/kubeops-api/
           docker push $ECR_REGISTRY/kubeops-api:$IMAGE_TAG
-
       - name: Build and push kubeops-ui
         run: |
           docker build -t $ECR_REGISTRY/kubeops-ui:$IMAGE_TAG services/kubeops-ui/
