@@ -14,3 +14,8 @@ data:
           - targets:
               - kubeops-api-service:5000
         metrics_path: /metrics
+
+      - job_name: node-exporter
+        static_configs:
+          - targets:
+              - node-exporter-service:9100
